@@ -1,0 +1,344 @@
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css"
+        integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx"
+        crossorigin="anonymous"></script>
+
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.7.16.min.js"></script>
+
+    <script>
+        AWS.config.update({
+            region: "eu-west-2",
+        });
+
+        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+            IdentityPoolId: 'eu-west-2:1056fccf-4913-4cc8-a259-cbe6d1c82cd7',
+        });
+
+        var docClient = new AWS.DynamoDB.DocumentClient();
+
+        function queryData(calendarId, calendarIndex) {
+            var slotsEvents = getSlotEvents();
+            var params = {
+                TableName: "google-calendar",
+                Key: {
+                    "entry": calendarId
+                }
+            };
+
+            docClient.get(params, function (err, data) {
+                if (err) {
+                    //document.getElementById('textarea').innerHTML += "Unable to query. Error: " + "\n" + JSON.stringify(err, undefined, 2);
+                } else {
+                    console.log(data.Item["calendar-data"]);
+
+                    var eventsForCalendar = data.Item["calendar-data"];
+
+                    for (var i = 0; i < slotsEvents.length; i++) {
+                        var slotDate = new Date();
+                        slotDate.setHours(slotsEvents[i]);
+
+                        if (slotDate.getHours() < 13) {
+                            $("#calendar" + calendarIndex + "_noon_today").append(addCalendarEntry(slotDate, "today"));
+                        } else {
+                            $("#calendar" + calendarIndex + "_afternoon_today").append(addCalendarEntry(slotDate, "today"));
+                        }
+
+                        // add class busy or free depends if current time slot got any event
+
+                        EventsExistsInSelectedTime(slotsEvents[i], eventsForCalendar, "today");
+
+                    }
+
+                    for (var i = 0; i < slotsEvents.length; i++) {
+                        var slotDate = new Date();
+                        slotDate.setHours(slotsEvents[i]);
+
+                        if (slotDate.getHours() < 13) {
+                            $("#calendar" + calendarIndex + "_noon_tomorrow").append(addCalendarEntry(slotDate, "tomorrow"));
+                        } else {
+                            $("#calendar" + calendarIndex + "_afternoon_tomorrow").append(addCalendarEntry(slotDate, "tomorrow"));
+                        }
+
+                        // add class busy or free depends if current time slot got any event
+
+                        EventsExistsInSelectedTime(slotsEvents[i], eventsForCalendar, "tomorrow");
+
+                    }
+                }
+            });
+        }
+
+    </script>
+
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+
+    <style>
+        .busy {
+            border-radius: 5px;
+            background: #a2293d;
+            height: 10px;
+            margin: 0 3px 0 0;
+        }
+
+        .notbusy {
+            border-radius: 5px;
+            background: #a3d29c;
+            height: 10px;
+            margin: 0 3px 0 0;
+        }
+
+        .main-image {
+            height: 278px;
+            width: 1080px;
+            background: #f3f3f3;
+        }
+
+        .main-wrapper {
+            width: 1080px;
+            margin: 0 auto;
+        }
+
+        .left-title {
+            margin-top: 20px;
+            width: 379px;
+            margin-left: 124px;
+        }
+
+        .left-box {
+            margin-top: 1px;
+            width: 379px;
+            height: 280px;
+            margin-left: 124px;
+        }
+
+        .right-box {
+            margin-top: 1px;
+            width: 377px;
+            height: 280px;
+            margin-left: 76px;
+        }
+
+        .Montserrat-text-bold {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 45px;
+            font-weight: bold;
+        }
+
+        .Montserrat-text-regular {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 45px;
+        }
+
+        .calendar-text {
+            margin-top: 92px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 45px;
+        }
+
+        .reset-row-margin {
+            margin: 0 !important;
+
+        }
+
+        .availability-text {
+            margin: 20px 0;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 30px;
+        }
+
+        .time {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 25px;
+            font-weight: bold;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div class="main-wrapper">
+        <div class="row main-image">image placeholder</div>
+
+        <div class="row">
+            <div class="left-box"> map tbc</div>
+            <div class="right-box">
+                <div class="calendar-text"><span class="Montserrat-text-bold">Meeting room</span> </br><span
+                        class="Montserrat-text-regular">First Floor</span></div>
+            </div>
+
+            <div id="todays-availability">
+                <div class="row">
+                    <div class="left-title">
+                        <span class="availability-text">Today's Availability</span>
+                    </div>
+                </div>
+                <div class="row reset-row-margin " id="today">
+                    <div class="left-box" id="calendar1_noon_today">
+
+                    </div>
+                    <div class="right-box" id="calendar1_afternoon_today">
+
+                    </div>
+                    <!-- <div class="col-sm" id="calendar2">
+
+            </div>
+            <div class="col-sm" id="calendar3">
+
+            </div> -->
+                </div>
+            </div>
+            <div id="tomorrows-availability" style="display: none;">
+                <div class="row">
+                    <div class="left-title">
+                        <span class="availability-text">Tomorrow's Availability</span>
+                    </div>
+                </div>
+                <div class="row reset-row-margin " id="tomorrow">
+                    <div class="left-box" id="calendar1_noon_tomorrow">
+
+                    </div>
+                    <div class="right-box" id="calendar1_afternoon_tomorrow">
+
+                    </div>
+                    <!-- <div class="col-sm" id="calendar2">
+
+            </div>
+            <div class="col-sm" id="calendar3">
+
+            </div> -->
+                </div>
+            </div>
+        </div>
+</body>
+
+<script>
+    window.addEventListener("load", (event) => {
+        queryData('theadambielecki@gmail.com', 1);
+        //queryData('ss6ekpcem2avr0dat9thek0pbs@group.calendar.google.com', 2);
+        //queryData('5g4662of8sj9eio3pvght8lm7o@group.calendar.google.com', 3);
+    });
+
+    function addCalendarEntry(time, today) {
+        var element = "";
+
+        var isToday = today == "today" ? "today" : "tomorrow";
+
+        // format time
+        var hour = new Date(time).getHours().toString();
+
+        if (hour.length < 2) {
+            hour = "0" + hour;
+        }
+
+        // create row
+        element = "<div class='row time' id='" + hour + "'>" + hour + ":00</div>";
+        element += "<div class='row'>";
+
+        element += "<div class='col-sm notbusy' id='" + hour + "00" + isToday + "''></div>";
+        element += "<div class='col-sm notbusy' id='" + hour + "30" + isToday + "''></div>";
+
+        element += "</div>";
+
+        return element;
+    }
+
+    function getSlotEvents() {
+        var slots = [];
+        var slotIndex = 0;
+        for (var i = 7; i < 19; i++) {
+            var date = new Date().setHours(i, 0);
+
+            slots[slotIndex] = new Date(date).getHours();
+
+            slotIndex++;
+        }
+
+        console.log(slots);
+        return slots;
+    }
+
+    function getCalendarEvents(events) {
+        var calendarEvents = [];
+        for (var i = 0; i < events.length; i++) {
+            //calendarEvents
+        }
+    }
+
+    function EventsExistsInSelectedTime(currentHour, events, today) {
+
+        var isToday = today == "today" ? "today" : "tomorrow";
+        for (var i = 0; i < events.length; i++) {
+
+            var startTimeHours = new Date(events[i].start.dateTime).getHours();
+            var endTimeHours = new Date(events[i].end.dateTime).getHours();
+            var endTimeMinutes = new Date(events[i].end.dateTime).getMinutes();
+
+            var currentTimeDate = new Date();
+            //currentTimeDate.setHours(currentHour);
+
+            if (isToday == "tomorrow") {
+                var tomorrow = new Date();
+                tomorrow.setDate(currentTimeDate.getDate() + 1);
+                tomorrow.setHours(0, 0, 0, 0);
+
+                currentTimeDate = tomorrow;
+            }
+
+            currentTimeDate.setHours(currentHour, 0, 0, 0);
+
+            var currentTimeDatePlus30Minutes = new Date(currentTimeDate);;
+            currentTimeDatePlus30Minutes.setMinutes(30);
+
+            var eventStartTime = new Date(events[i].start.dateTime);
+            var eventEndTime = new Date(events[i].end.dateTime);
+
+            if ((eventStartTime.getTime() <= currentTimeDate.getTime()) && (eventEndTime.getTime() > currentTimeDate.getTime())) {
+
+                var hour = currentHour;
+                if (hour.length < 2) {
+                    hour = "0" + hour;
+                }
+
+                // append busy class
+                $("#" + hour + "00" + isToday).removeClass("notbusy").addClass("busy");
+
+            }
+
+            // check next 30 minutes slot for this hour
+
+            if ((eventStartTime.getTime() <= currentTimeDatePlus30Minutes.getTime()) && (eventEndTime.getTime() > currentTimeDatePlus30Minutes.getTime())) {
+
+                var hour = currentHour;
+                if (hour.length < 2) {
+                    hour = "0" + hour;
+                }
+
+                // append busy class
+                $("#" + hour + "30" + isToday).removeClass("notbusy").addClass("busy");
+
+            }
+
+        }
+
+    }
+
+    // toggle between today and tomorrow
+
+    window.setInterval(function(){
+        $("#todays-availability").toggle(1000);
+        $("#tomorrows-availability").toggle(1000);
+
+}, 15000);
+
+</script>
+
+</html>
